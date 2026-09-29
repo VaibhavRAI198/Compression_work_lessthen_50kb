@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        PDF Converter & Compressor
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+
+</head>
+
+
+<body>
+
+
+<main class="container">
+
+
+    <!-- ==================================================
+         MESSAGE
+    =================================================== -->
+
+    <div
+        id="messageBox"
+        class="message-box"
+    ></div>
+
+
+    <!-- ==================================================
+         TOOLS
+    =================================================== -->
+
+    <div class="tools">
+
+
+        <!-- ==================================================
+             PDF TO JPG
+        =================================================== -->
+
+        <section class="tool-card">
+
+            <div class="icon">
+                🖼️
+            </div>
+
+
+            <h2>
+                PDF to JPG
+            </h2>
+
+
+            <p>
+                Select one or multiple PDF files.
+                Every page will be converted into
+                a JPG and compressed to
+                <strong>50 KB or less</strong>.
+            </p>
+
+
+
+            <form
+                id="jpgForm"
+                action="{{ url_for('pdf_to_jpg_50kb') }}"
+                method="POST"
+                enctype="multipart/form-data"
+            >
+
+
+                <label
+                    class="file-label"
+                    for="pdf_file"
+                >
+
+                    <span class="upload-icon">
+                        ⬆
+                    </span>
+
+                    Select PDF Files
+
+                </label>
+
+
+                <input
+                    type="file"
+                    id="pdf_file"
+                    name="pdf_file"
+                    accept=".pdf,application/pdf"
+                    multiple
+                    required
+                >
+
+
+                <div
+                    class="file-name"
+                    id="pdfName"
+                >
+                    No files selected
+                </div>
+
+
+                <button
+                    type="submit"
+                    class="btn"
+                    id="jpgButton"
+                >
+
+                    Convert & Compress
+
+                </button>
+
+
+            </form>
+
+        </section>
+
+
+
+        <!-- ==================================================
+             PDF TO 50 KB
+        =================================================== -->
+
+        <section class="tool-card">
+
+            <div class="icon">
+                📑
+            </div>
+
+
+            <h2>
+                PDF to 50 KB
+            </h2>
+
+
+            <p>
+                Select multiple PDF files.
+                Each PDF will be compressed separately
+                to <strong>50 KB or less</strong>.
+            </p>
+
+            <form
+                id="compressForm"
+                action="{{ url_for('compress_pdf') }}"
+                method="POST"
+                enctype="multipart/form-data"
+            >
+
+
+                <label
+                    class="file-label"
+                    for="pdf_compress_file"
+                >
+
+                    <span class="upload-icon">
+                        ⬆
+                    </span>
+
+                    Select Multiple PDFs
+
+                </label>
+
+
+                <input
+                    type="file"
+                    id="pdf_compress_file"
+                    name="pdf_compress_file"
+                    accept=".pdf,application/pdf"
+                    multiple
+                    required
+                >
+
+
+                <div
+                    class="file-name"
+                    id="compressPdfName"
+                >
+                    No files selected
+                </div>
+
+
+                <button
+                    type="submit"
+                    class="btn"
+                    id="compressButton"
+                >
+
+                    Compress PDFs
+
+                </button>
+
+
+            </form>
+
+        </section>
+
+
+    </div>
+
+</main>
+
+
+
+<script>
+
+
+// ========================================================
+// MESSAGE FUNCTION
+// ========================================================
+
+function showMessage(
+    message,
+    type = "error"
+) {
+
+    const box =
+        document.getElementById(
+            "messageBox"
+        );
+
+
+    box.textContent = message;
+
+    box.className =
+        "message-box " + type;
+
+}
+
+
+// ========================================================
+// AUTOMATIC DOWNLOAD
+// ========================================================
+
+async function downloadFiles(
+    files
+) {
+
+    for (
+        let i = 0;
+        i < files.length;
+        i++
+    ) {
+
+        const file =
+            files[i];
+
+
+        try {
+
+            const response =
+                await fetch(
+                    file.url
+                );
+
+
+            if (!response.ok) {
+
+                throw new Error(
+                    "Download failed"
+                );
+
+            }
+
+
+            const blob =
+                await response.blob();
+
+
+            const blobUrl =
+                window.URL.createObjectURL(
+                    blob
+                );
+
+
+            const link =
+                document.createElement(
+                    "a"
+                );
+
+
+            link.href =
+                blobUrl;
+
+
+            link.download =
+                file.name;
+
+
+            document.body.appendChild(
+                link
+            );
+
+
+            link.click();
+
+
+            link.remove();
+
+
+            window.URL.revokeObjectURL(
+                blobUrl
+            );
+
+
+            // Small delay between
+            // multiple downloads.
+            await new Promise(
+                resolve =>
+                    setTimeout(
+                        resolve,
+                        500
+                    )
+            );
+
+
+        }
+        catch (error) {
+
+            console.error(
+                error
+            );
+
+            showMessage(
+                "One of the files could not be downloaded.",
+                "error"
+            );
+
+        }
+
+    }
+
+}
+
+
+// ========================================================
+// PDF -> JPG
+// ========================================================
+
+const jpgForm =
+    document.getElementById(
+        "jpgForm"
+    );
+
+
+jpgForm.addEventListener(
+    "submit",
+    async function(event) {
+
+        event.preventDefault();
+
+
+        const input =
+            document.getElementById(
+                "pdf_file"
+            );
+
+
+        const button =
+            document.getElementById(
+                "jpgButton"
+            );
+
+
+        if (
+            !input.files ||
+            input.files.length === 0
+        ) {
+
+            showMessage(
+                "Please select at least one PDF.",
+                "error"
+            );
+
+            return;
+
+        }
+
+
+        button.disabled = true;
+
+        button.textContent =
+            "Processing...";
+
+
+        showMessage(
+            "Converting PDF to JPG. Please wait...",
+            "success"
+        );
+
+
+        try {
+
+            const formData =
+                new FormData(
+                    jpgForm
+                );
+
+
+            const response =
+                await fetch(
+                    jpgForm.action,
+                    {
+                        method: "POST",
+                        body: formData
+                    }
+                );
+
+
+            const data =
+                await response.json();
+
+
+            if (!response.ok || !data.success) {
+
+                throw new Error(
+                    data.message ||
+                    "PDF conversion failed."
+                );
+
+            }
+
+
+            showMessage(
+                data.files.length +
+                " JPG file(s) ready. Downloading automatically...",
+                "success"
+            );
+
+
+            await downloadFiles(
+                data.files
+            );
+
+
+            showMessage(
+                "All JPG files have been downloaded.",
+                "success"
+            );
+
+
+        }
+        catch (error) {
+
+            showMessage(
+                error.message ||
+                "Something went wrong.",
+                "error"
+            );
+
+        }
+        finally {
+
+            button.disabled = false;
+
+            button.textContent =
+                "Convert & Compress";
+
+        }
+
+    }
+);
+
+
+// ========================================================
+// PDF COMPRESSION
+// ========================================================
+
+const compressForm =
+    document.getElementById(
+        "compressForm"
+    );
+
+
+compressForm.addEventListener(
+    "submit",
+    async function(event) {
+
+        event.preventDefault();
+
+
+        const input =
+            document.getElementById(
+                "pdf_compress_file"
+            );
+
+
+        const button =
+            document.getElementById(
+                "compressButton"
+            );
+
+
+        if (
+            !input.files ||
+            input.files.length === 0
+        ) {
+
+            showMessage(
+                "Please select at least one PDF.",
+                "error"
+            );
+
+            return;
+
+        }
+
+
+        button.disabled = true;
+
+        button.textContent =
+            "Compressing...";
+
+
+        showMessage(
+            "Compressing PDF files. Please wait...",
+            "success"
+        );
+
+
+        try {
+
+            const formData =
+                new FormData(
+                    compressForm
+                );
+
+
+            const response =
+                await fetch(
+                    compressForm.action,
+                    {
+                        method: "POST",
+                        body: formData
+                    }
+                );
+
+
+            const data =
+                await response.json();
+
+
+            if (!response.ok || !data.success) {
+
+                throw new Error(
+                    data.message ||
+                    "PDF compression failed."
+                );
+
+            }
+
+
+            showMessage(
+                data.files.length +
+                " PDF file(s) ready. Downloading automatically...",
+                "success"
+            );
+
+
+            await downloadFiles(
+                data.files
+            );
+
+
+            showMessage(
+                "All compressed PDF files have been downloaded.",
+                "success"
+            );
+
+
+        }
+        catch (error) {
+
+            showMessage(
+                error.message ||
+                "Something went wrong.",
+                "error"
+            );
+
+        }
+        finally {
+
+            button.disabled = false;
+
+            button.textContent =
+                "Compress PDFs";
+
+        }
+
+    }
+);
+
+
+// ========================================================
+// SHOW SELECTED JPG FILES
+// ========================================================
+
+document
+    .getElementById("pdf_file")
+    .addEventListener(
+        "change",
+        function() {
+
+            const output =
+                document.getElementById(
+                    "pdfName"
+                );
+
+
+            if (
+                this.files &&
+                this.files.length > 0
+            ) {
+
+                if (
+                    this.files.length === 1
+                ) {
+
+                    output.textContent =
+                        this.files[0].name;
+
+                }
+                else {
+
+                    output.textContent =
+                        this.files.length +
+                        " PDF files selected";
+
+                }
+
+            }
+            else {
+
+                output.textContent =
+                    "No files selected";
+
+            }
+
+        }
+    );
+
+
+// ========================================================
+// SHOW SELECTED COMPRESS FILES
+// ========================================================
+
+document
+    .getElementById("pdf_compress_file")
+    .addEventListener(
+        "change",
+        function() {
+
+            const output =
+                document.getElementById(
+                    "compressPdfName"
+                );
+
+
+            if (
+                this.files &&
+                this.files.length > 0
+            ) {
+
+                if (
+                    this.files.length === 1
+                ) {
+
+                    output.textContent =
+                        this.files[0].name;
+
+                }
+                else {
+
+                    output.textContent =
+                        this.files.length +
+                        " PDF files selected";
+
+                }
+
+            }
+            else {
+
+                output.textContent =
+                    "No files selected";
+
+            }
+
+        }
+    );
+
+
+</script>
+
+
+</body>
+
+</html>
